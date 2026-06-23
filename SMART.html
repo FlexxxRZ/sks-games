@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0b1a2a">
+    <title>SMART — игра ГК «СКС»</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; font-family: system-ui, sans-serif; }
+        html, body { -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+        button { touch-action: manipulation; }
+        body { background: #0b1a2a; min-height: 100vh; min-height: 100dvh; display: flex; justify-content: center; align-items: center; padding: 10px; padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+        #game { max-width: 420px; width: 100%; background: linear-gradient(145deg, #1a2f4c, #0f2135); border-radius: 36px; padding: 20px 16px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.7); border: 1px solid #f5a62333; position: relative; }
+        .header { display: flex; justify-content: space-between; align-items: center; color: #f5f0e6; font-weight: 600; padding-bottom: 12px; border-bottom: 1px solid #f5a62333; }
+        .brand span { background: #f5a623; color: #0f2135; padding: 2px 12px; border-radius: 20px; font-size: 14px; }
+        .brand { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+        .brand .game { font-weight: 800; letter-spacing: 1px; }
+        .brand .company { color: #8ba0b8; font-size: 10px; font-weight: 600; }
+        .head-right { display:flex; align-items:center; gap:8px; }
+        .floor { font-size: 12px; color:#8ba0b8; }
+        .timer { font-size: 26px; font-weight: 800; color: #f5a623; background: #0b1a2a; padding: 2px 14px; border-radius: 30px; border: 1px solid #f5a62366; }
+        .timer.danger { color: #e74c3c; animation: blink 0.6s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+        @keyframes pop { 0%{transform:scale(0.6);opacity:0} 100%{transform:scale(1);opacity:1} }
+        .progress { display: flex; gap: 6px; margin: 12px 0 14px; }
+        .progress div { flex: 1; height: 6px; background: #0b1a2a; border-radius: 10px; overflow: hidden; }
+        .progress div span { display: block; height: 100%; width: 0%; background: #f5a623; border-radius: 10px; transition: width 0.4s; }
+        .task-area { background: #0b1a2a; border-radius: 20px; padding: 14px 12px; min-height: 160px; border: 1px solid #2a4a6a; }
+        .task-card { background: #132b40; border-radius: 14px; padding: 14px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #f5a623; margin-bottom: 8px; animation: pop 0.25s ease; }
+        .task-card.fire { border-left-color:#e74c3c; background:#2a1414; animation: shake 0.4s infinite; }
+        .task-card .info { display: flex; flex-direction: column; gap: 2px; }
+        .task-card .name { color: #f5f0e6; font-weight: 600; font-size: 16px; }
+        .task-card .sub { color: #8ba0b8; font-size: 12px; }
+        .task-card .actions button { background: transparent; border: 1px solid #4a6a8a; border-radius: 30px; padding: 6px 14px; color: #f5f0e6; font-weight: 600; font-size: 13px; cursor: pointer; }
+        .task-card .actions button:active { transform: scale(0.94); }
+        .task-card .actions .buy { background: #f5a623; color: #0f2135; border-color: #f5a623; }
+        .task-card .actions .firebtn { background: #e74c3c; color: #fff; border-color: #e74c3c; animation: blink 0.7s infinite; }
+        .task-card .badge { background: #e74c3c; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 30px; animation: blink 0.8s infinite; }
+        .task-card.done { opacity: 0.6; border-left-color: #2ecc71; }
+        .task-card.waiting { border-left-color: #4a90d9; background: #16273e; }
+        .task-card.waiting .wait-label { background: #4a90d9; color: #fff; padding: 2px 10px; border-radius: 30px; font-size: 11px; font-weight: 700; }
+        .hint { color: #8ba0b8; font-size: 12px; text-align: center; margin-top: 8px; }
+
+        .dialog { background: #0b1a2a; border-radius: 20px; padding: 16px; margin: 10px 0; border: 2px solid #f5a623; display: none; }
+        .dialog.active { display: block; }
+        .dialog .header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .dialog .header .avatar { width: 44px; height: 44px; background: #1a2f4c; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px solid #f5a623; flex: 0 0 auto; }
+        .dialog .header .avatar svg { width: 100%; height: 100%; display: block; }
+        .player-av { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; border: 2px solid #f5a623; flex: 0 0 auto; background:#0f2135; }
+        .player-av svg { width: 100%; height: 100%; display: block; }
+        .brand-row { display: flex; align-items: center; gap: 8px; }
+        .dialog .text { color: #d0dce8; font-size: 14px; padding: 8px 0 12px; border-bottom: 1px solid #1a2f4c; margin-bottom: 12px; }
+        .dialog .options { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .dialog .options .opt { flex: 1; min-width: 80px; background: #132b40; border-radius: 14px; padding: 10px 6px; text-align: center; border: 2px solid transparent; cursor: pointer; }
+        .dialog .options .opt .price { font-weight: 800; font-size: 18px; color: #f5f0e6; }
+        .dialog .options .opt .desc { font-size: 11px; color: #8ba0b8; }
+        .dialog .options .opt .conseq { font-size: 10px; color: #e74c3c; margin-top: 4px; }
+        .dialog .options .opt.cheap { border-color: #2ecc71; }
+        .dialog .options .opt.quality { border-color: #4a90d9; }
+        .dialog .options .opt.fast { border-color: #f5a623; }
+        .dialog .options .opt.dim { opacity: 0.3; pointer-events:none; }
+        .dialog .options .opt.pickable:active { transform: scale(0.95); }
+        .dialog .options .opt.selected { border-color: #fff; background: #1a2f4c; }
+        #economistGame .opt { transition: transform .12s, box-shadow .12s, background .12s; }
+        #economistGame .opt:active { transform: scale(0.96); }
+        #economistGame .opt.selected { background: #244a6e !important; box-shadow: inset 0 0 0 2px #fff, 0 0 12px #f5a62366; color: #fff; font-weight: 700; transform: translateY(-1px); }
+        #economistGame .opt.selected::after { content: " ✓"; color: #2ecc71; font-weight: 800; }
+        .dialog .arg-area { display: none; flex-direction: column; gap: 8px; margin-top: 12px; }
+        .dialog .arg-area.active { display: flex; }
+        .dialog .arg-area .argclock { text-align:center; color:#f5a623; font-weight:700; font-size:13px; }
+        .dialog .arg-area .arg-btn { background: #132b40; border: 1px solid #2a4a6a; border-radius: 12px; padding: 12px; color: #f5f0e6; font-size: 14px; cursor: pointer; text-align:left; }
+        .dialog .arg-area .arg-btn:active { transform: scale(0.97); }
+        .dialog .arg-area .arg-btn.correct { border-color: #2ecc71; background: #1a3a2a; }
+        .dialog .arg-area .arg-btn.wrong { border-color: #e74c3c; background: #3a1a1a; }
+        .dialog .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+        .dialog .actions button { padding: 8px 20px; border-radius: 30px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; }
+        .dialog .actions .btn-primary { background: #f5a623; color: #0f2135; }
+        .dialog .actions .btn-secondary { background: #4a6a8a; color: #fff; }
+        .dialog .actions .btn-success { background: #2ecc71; color: #0f2135; }
+        .dialog .mini-game { margin: 10px 0; text-align: center; }
+        .innrow { display:flex; align-items:center; gap:6px; justify-content:center; margin:4px 0; }
+        .innrow .lbl { color:#8ba0b8; font-size:12px; width:64px; text-align:right; }
+        .innrow .digits { background:#132b40; border-radius:8px; padding:6px 8px; letter-spacing:2px; font-weight:bold; font-size:19px; color:#f5f0e6; }
+        .innrow .digits .d { padding:1px 3px; border-radius:4px; cursor:pointer; }
+        .innrow .digits .d:active { background:#f5a62355; }
+        .accClock { color:#f5a623; font-weight:700; font-size:13px; margin-top:6px; }
+
+        .consequence { background: #2a1a1a; border: 1px solid #e74c3c; border-radius: 16px; padding: 12px; margin: 10px 0; display: none; }
+        .consequence.active { display: block; }
+        .consequence .title { color: #e74c3c; font-weight: 700; }
+        .consequence div+div { color:#d0dce8; font-size:13px; margin-top:4px; }
+
+        .stats { display: flex; justify-content: space-between; color: #8ba0b8; font-size: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #1a2f4c; }
+        .stats .stat-item { display: flex; align-items: center; gap: 4px; flex-direction:column; }
+        .stats .stat-item .val { color: #f5f0e6; font-weight: 700; font-size: 16px; }
+        .stats .stat-item.combo .val { color:#f5a623; }
+
+        .modal { position: absolute; top:0; left:0; right:0; bottom:0; background: #000000cc; display: none; align-items: center; justify-content: center; border-radius: 36px; backdrop-filter: blur(4px); padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background: #1a2f4c; border-radius: 28px; padding: 28px 20px; max-width: 320px; width:100%; text-align: center; border: 1px solid #f5a62366; }
+        .modal-content .emoji { font-size: 50px; }
+        .modal-content h2 { color: #f5f0e6; margin: 8px 0; }
+        .modal-content p { color: #b0c8dd; font-size: 14px; }
+        .modal-content .best { color:#f5a623; font-weight:700; margin-top:6px; font-size:14px; }
+        .modal-content .btn-restart { background: #f5a623; border: none; border-radius: 40px; padding: 12px 32px; font-weight: 800; font-size: 16px; color: #0f2135; cursor: pointer; margin-top: 12px; }
+        .perk-card { background:#132b40; border:2px solid #2a4a6a; border-radius:16px; padding:12px; cursor:pointer; text-align:left; display:flex; gap:10px; align-items:center; }
+        .perk-card:hover { border-color:#f5a623; }
+        .perk-card:active { transform:scale(0.97); }
+        .perk-card .pic { font-size:26px; flex:0 0 auto; }
+        .perk-card .pt { color:#f5f0e6; font-weight:700; font-size:15px; }
+        .perk-card .pd { color:#8ba0b8; font-size:12px; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0f2135ee; color: #f5f0e6; padding: 10px 24px; border-radius: 40px; border: 1px solid #f5a623; font-size: 14px; font-weight: 600; display: none; z-index: 200; backdrop-filter: blur(4px); text-align:center; }
+        .toast.show { display: block; }
+    </style>
+</head>
+<body>
+<div id="game">
+    <div class="header">
+        <div class="brand-row">
+            <div class="player-av" title="Вы — снабженец">
+                <svg viewBox="0 0 40 40">
+                    <rect width="40" height="40" fill="#0f2135"/>
+                    <path d="M6 40 Q6 30 14 28 L26 28 Q34 30 34 40 Z" fill="#f5a623"/>
+                    <rect x="10" y="32" width="20" height="2" fill="#fff" opacity="0.75"/>
+                    <rect x="17.5" y="24" width="5" height="5" fill="#e0a578"/>
+                    <ellipse cx="20" cy="18" rx="7.5" ry="8.5" fill="#eab985"/>
+                    <circle cx="12.5" cy="18.5" r="1.4" fill="#eab885"/>
+                    <circle cx="27.5" cy="18.5" r="1.4" fill="#eab885"/>
+                    <path d="M10 14 Q10 7 20 7 Q30 7 30 14 Z" fill="#f5c543"/>
+                    <rect x="9" y="13.3" width="22" height="2.4" rx="1.2" fill="#e0a91f"/>
+                    <rect x="19" y="7.3" width="2" height="6.2" fill="#e0a91f"/>
+                    <circle cx="16.8" cy="19" r="1" fill="#2a2a2a"/>
+                    <circle cx="23.2" cy="19" r="1" fill="#2a2a2a"/>
+                    <path d="M17 22.5 Q20 25 23 22.5" fill="none" stroke="#a85d4a" stroke-width="1.1" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="brand"><span class="game">SMART</span><small class="company">СКС Ломбард</small></div>
+        </div>
+        <div class="head-right">
+            <button id="voiceBtn" title="Озвучка голосом" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:0;line-height:1;">🗣️</button>
+            <span class="floor" id="floorLabel">Этаж 1</span>
+            <div class="timer" id="timerDisplay">60</div>
+        </div>
+    </div>
+    <div class="progress">
+        <div><span id="prog1"></span></div>
+        <div><span id="prog2"></span></div>
+        <div><span id="prog3"></span></div>
+    </div>
+    <div class="task-area">
+        <div id="taskContainer"></div>
+        <div class="hint" id="hintText">💡 Нажмите «Купить»</div>
+    </div>
+
+    <!-- Диалог СБ -->
+    <div class="dialog" id="sbDialog">
+        <div class="header">
+            <div class="avatar">
+                <svg viewBox="0 0 40 40">
+                    <rect width="40" height="40" fill="#16273e"/>
+                    <path d="M5 40 Q5 30 14 28 L26 28 Q35 30 35 40 Z" fill="#22344c"/>
+                    <path d="M16 28 L20 33 L24 28 Z" fill="#1a2535"/>
+                    <rect x="17" y="24" width="6" height="6" fill="#d99a6c"/>
+                    <ellipse cx="20" cy="18" rx="8" ry="9" fill="#e3b288"/>
+                    <circle cx="11.8" cy="18.5" r="1.6" fill="#e3b288"/>
+                    <circle cx="28.2" cy="18.5" r="1.6" fill="#e3b288"/>
+                    <path d="M10.5 14 Q20 5 29.5 14 L29.5 15.5 L10.5 15.5 Z" fill="#1a2535"/>
+                    <rect x="10.5" y="14.5" width="19" height="2.6" fill="#0f1826"/>
+                    <rect x="18.4" y="10.5" width="3.2" height="3.2" rx="0.5" fill="#f5a623"/>
+                    <rect x="14.8" y="17" width="3.6" height="1.2" rx="0.6" fill="#4a2f1c"/>
+                    <rect x="21.6" y="17" width="3.6" height="1.2" rx="0.6" fill="#4a2f1c"/>
+                    <circle cx="16.6" cy="19.4" r="1" fill="#2a2a2a"/>
+                    <circle cx="23.4" cy="19.4" r="1" fill="#2a2a2a"/>
+                    <rect x="17" y="23.2" width="6" height="1.2" rx="0.6" fill="#a85d4a"/>
+                </svg>
+            </div>
+            <div><strong>Служба Безопасности</strong><br><small style="color:#8ba0b8;">Бюджетный контроль</small></div>
+        </div>
+        <div class="text" id="sbText">Предлагаем самый бюджетный вариант. Согласны?</div>
+        <div class="options" id="priceOptions">
+            <div class="opt cheap" data-type="cheap"><div class="price">1 200 ₽</div><div class="desc">Дёшево</div><div class="conseq">→ брак, переделка</div></div>
+            <div class="opt quality" data-type="quality"><div class="price">2 500 ₽</div><div class="desc">Качественно</div><div class="conseq" style="color:#4a90d9;">→ надёжно, доставка</div></div>
+            <div class="opt fast" data-type="fast"><div class="price">3 700 ₽</div><div class="desc">Быстро</div><div class="conseq" style="color:#f5a623;">→ сразу, дорого</div></div>
+        </div>
+        <div class="arg-area" id="argArea"></div>
+        <div class="actions" id="sbActions">
+            <button class="btn-secondary" id="sbAgree">😔 Взять дёшево</button>
+            <button class="btn-primary" id="sbDebate">🤔 Отстоять качество</button>
+        </div>
+    </div>
+
+    <!-- Диалог Экономиста -->
+    <div class="dialog" id="economistDialog">
+        <div class="header">
+            <div class="avatar">
+                <svg viewBox="0 0 40 40">
+                    <rect width="40" height="40" fill="#16273e"/>
+                    <path d="M5 40 Q5 30 14 28 L26 28 Q35 30 35 40 Z" fill="#2e8b8b"/>
+                    <rect x="17.5" y="24" width="5" height="6" fill="#e0a578"/>
+                    <path d="M10 21 Q9 8 20 8 Q31 8 30 21 L30 29 L26 25 Q26 12 20 12 Q14 12 14 25 L10 29 Z" fill="#6b4423"/>
+                    <ellipse cx="20" cy="18" rx="7.5" ry="8.5" fill="#f0c89a"/>
+                    <path d="M12.5 14.5 Q20 8.5 27.5 14.5 Q24 11 20 11 Q16 11 12.5 14.5 Z" fill="#6b4423"/>
+                    <circle cx="16.7" cy="19" r="2.5" fill="#0b1a2a" fill-opacity="0.12" stroke="#2a2a2a" stroke-width="0.9"/>
+                    <circle cx="23.3" cy="19" r="2.5" fill="#0b1a2a" fill-opacity="0.12" stroke="#2a2a2a" stroke-width="0.9"/>
+                    <line x1="19.2" y1="19" x2="20.8" y2="19" stroke="#2a2a2a" stroke-width="0.9"/>
+                    <circle cx="16.7" cy="19" r="0.9" fill="#2a2a2a"/>
+                    <circle cx="23.3" cy="19" r="0.9" fill="#2a2a2a"/>
+                    <path d="M17.5 23 Q20 25 22.5 23" fill="none" stroke="#b5645a" stroke-width="1" stroke-linecap="round"/>
+                    <circle cx="11.6" cy="20.5" r="1.1" fill="#f5a623"/>
+                    <circle cx="28.4" cy="20.5" r="1.1" fill="#f5a623"/>
+                </svg>
+            </div>
+            <div><strong>Экономист</strong><br><small style="color:#8ba0b8;">Бюджетный контроль</small></div>
+        </div>
+        <div class="text" id="economistText">Проверяю наличие средств... Бюджет ограничен. Нужно перераспределить.</div>
+        <div id="economistGame" style="margin:10px 0;">
+            <div style="color:#8ba0b8; font-size:13px; margin-bottom:6px;">Выберите приоритет финансирования:</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+                <div class="opt" data-prio="task" style="flex:1; min-width:80px; background:#132b40; border-radius:14px; padding:10px; text-align:center; border:2px solid #4a90d9; cursor:pointer;">📦 Текущая задача</div>
+                <div class="opt" data-prio="balance" style="flex:1; min-width:80px; background:#132b40; border-radius:14px; padding:10px; text-align:center; border:2px solid #2ecc71; cursor:pointer;">⚖️ Равномерно</div>
+                <div class="opt" data-prio="other" style="flex:1; min-width:80px; background:#132b40; border-radius:14px; padding:10px; text-align:center; border:2px solid #f5a623; cursor:pointer;">📋 Резерв</div>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn-success" id="economistOk">✅ Готово</button>
+        </div>
+    </div>
+
+    <!-- Диалог Бухгалтера -->
+    <div class="dialog" id="accountantDialog">
+        <div class="header">
+            <div class="avatar">
+                <svg viewBox="0 0 40 40">
+                    <rect width="40" height="40" fill="#16273e"/>
+                    <path d="M5 40 Q5 30 14 28 L26 28 Q35 30 35 40 Z" fill="#e8ecf2"/>
+                    <path d="M16 28 L20 31.5 L24 28 L22 27 L18 27 Z" fill="#fff"/>
+                    <path d="M20 30 L18.3 33 L20 39 L21.7 33 Z" fill="#c0392b"/>
+                    <rect x="17.5" y="24" width="5" height="5" fill="#e0a578"/>
+                    <ellipse cx="20" cy="18" rx="7.5" ry="8.5" fill="#eab985"/>
+                    <path d="M12.3 16 Q12 8.5 20 8.5 Q28 8.5 27.7 16 Q24 12 20 12 Q16 12 12.3 16 Z" fill="#3a3a3a"/>
+                    <circle cx="12.5" cy="18.5" r="1.4" fill="#eab985"/>
+                    <circle cx="27.5" cy="18.5" r="1.4" fill="#eab985"/>
+                    <rect x="13.8" y="17.4" width="4.8" height="3.3" rx="0.8" fill="#0b1a2a" fill-opacity="0.12" stroke="#2a2a2a" stroke-width="0.9"/>
+                    <rect x="21.4" y="17.4" width="4.8" height="3.3" rx="0.8" fill="#0b1a2a" fill-opacity="0.12" stroke="#2a2a2a" stroke-width="0.9"/>
+                    <line x1="18.6" y1="19" x2="21.4" y2="19" stroke="#2a2a2a" stroke-width="0.9"/>
+                    <circle cx="16.2" cy="19.1" r="0.9" fill="#2a2a2a"/>
+                    <circle cx="23.8" cy="19.1" r="0.9" fill="#2a2a2a"/>
+                    <rect x="17.5" y="23.2" width="5" height="1.1" rx="0.5" fill="#a85d4a"/>
+                </svg>
+            </div>
+            <div><strong>Бухгалтер</strong><br><small style="color:#8ba0b8;">Проверка реквизитов</small></div>
+        </div>
+        <div class="text" id="accountantText">Сверьте ИНН в договоре и счёте. Кликните цифру, которая НЕ совпадает.</div>
+        <div class="mini-game" id="accountantGame">
+            <div class="innrow"><span class="lbl">Договор:</span><span class="digits" id="innRef"></span></div>
+            <div class="innrow"><span class="lbl">Счёт:</span><span class="digits" id="innDisplay"></span></div>
+            <div class="accClock" id="accClock">⏱️ 4</div>
+        </div>
+    </div>
+
+    <div class="consequence" id="consequenceBox">
+        <div class="title">⚠️ БРАК! ПЕРЕДЕЛКА!</div>
+        <div id="consequenceDesc">Дешёвый товар сломался. Требуется замена.</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">💰 Бюджет<span class="val" id="budgetVal">100%</span></div>
+        <div class="stat-item">⭐ Очки<span class="val" id="scoreVal">0</span></div>
+        <div class="stat-item combo">🔥 Серия<span class="val" id="comboVal">0</span></div>
+        <div class="stat-item">📦 Задачи<span class="val"><span id="tasksDone">0</span>/<span id="tasksTotal">3</span></span></div>
+    </div>
+
+    <div class="modal" id="modalOverlay">
+        <div class="modal-content">
+            <div class="emoji" id="modalEmoji">🏆</div>
+            <h2 id="modalTitle">Этаж сдан!</h2>
+            <p id="modalDesc">Отличная работа!</p>
+            <p class="best" id="modalBest"></p>
+            <button class="btn-restart" id="btnRestart">🔄 Следующий этаж</button>
+        </div>
+    </div>
+    <div class="modal" id="perkModal">
+        <div class="modal-content">
+            <div class="emoji">🎁</div>
+            <h2>Этаж пройден!</h2>
+            <p>Выберите улучшение для следующих этажей:</p>
+            <div id="perkChoices" style="display:flex;flex-direction:column;gap:10px;margin-top:14px;"></div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+</div>
+<script>
+    // ===== СКС ЛОМБАРД: ОФИСНЫЙ ПОЖАРНЫЙ =====
+    const $ = id => document.getElementById(id);
+    const timerDisplay=$('timerDisplay'), floorLabel=$('floorLabel'), taskContainer=$('taskContainer'), hintText=$('hintText');
+    const sbDialog=$('sbDialog'), sbText=$('sbText'), priceOptions=$('priceOptions'), argArea=$('argArea'), sbActions=$('sbActions'), sbAgree=$('sbAgree'), sbDebate=$('sbDebate');
+    const economistDialog=$('economistDialog'), economistText=$('economistText'), economistOk=$('economistOk');
+    const accountantDialog=$('accountantDialog'), innRef=$('innRef'), innDisplay=$('innDisplay'), accClock=$('accClock');
+    const consequenceBox=$('consequenceBox'), consequenceDesc=$('consequenceDesc');
+
+    // ===== ОЗВУЧКА ГОЛОСОМ (Web Speech API, русские голоса, офлайн) =====
+    const VOICE={on:true};
+    let _voices=[], _ruVoices=[], _assigned={};
+    const VPROFILE={ narrator:{pitch:1.0,rate:1.0}, sb:{pitch:0.8,rate:0.97}, economist:{pitch:1.3,rate:1.04}, accountant:{pitch:1.0,rate:1.12} };
+    function assignVoices(){
+        const fem=/irina|milena|katya|alyona|alena|tatyana|elena|maria|svetlana|oksana|daria|anna|google|ирина|милена|екатерина|татьяна|елена|мария|светлана|оксана|дарья|анна|алёна/i;
+        const male=/pavel|yuriy?|dmitr|maxim|artem|artemiy|nikolay|aleksandr|alexey|sergey|павел|юрий|дмитрий|максим|артём|николай|александр|алексей|сергей/i;
+        const ru=_ruVoices.length?_ruVoices:_voices;
+        const female=ru.find(v=>fem.test(v.name)), maleV=ru.find(v=>male.test(v.name));
+        const other=ru.find(v=>v!==female&&v!==maleV);
+        _assigned={ narrator:ru[0]||null, sb:maleV||ru[0]||null, economist:female||other||ru[1]||ru[0]||null, accountant:other||ru[2]||ru[1]||ru[0]||null };
+    }
+    function refreshVoices(){ try{ if(!window.speechSynthesis) return; _voices=speechSynthesis.getVoices()||[]; _ruVoices=_voices.filter(v=>/^ru\b|ru[-_]ru|русск/i.test((v.lang||'')+' '+(v.name||''))); assignVoices(); }catch(e){} }
+    function say(text, role){
+        if(!VOICE.on || !text) return;
+        try{ if(!window.speechSynthesis) return; speechSynthesis.cancel();
+            const t=String(text).replace(/[^\p{L}\p{N}\s.,!?%₽–-]/gu,' ').replace(/\s+/g,' ').trim();
+            if(!t) return;
+            const p=VPROFILE[role]||VPROFILE.narrator;
+            const u=new SpeechSynthesisUtterance(t); u.lang='ru-RU'; u.rate=p.rate; u.pitch=p.pitch; u.volume=1;
+            const v=(_assigned[role]||_assigned.narrator); if(v) u.voice=v;
+            speechSynthesis.speak(u);
+        }catch(e){}
+    }
+    if(window.speechSynthesis){ refreshVoices(); window.speechSynthesis.onvoiceschanged=refreshVoices; }
+    try{ VOICE.on = localStorage.getItem('sks_voice')!=='0'; }catch(e){}
+    function updateVoiceBtn(){ const b=$('voiceBtn'); if(b){ b.textContent='🗣️'; b.style.opacity=VOICE.on?'1':'0.4'; } }
+    if($('voiceBtn')) $('voiceBtn').addEventListener('click',()=>{ VOICE.on=!VOICE.on; try{localStorage.setItem('sks_voice',VOICE.on?'1':'0');}catch(e){} updateVoiceBtn(); if(VOICE.on) say('Озвучка включена'); else if(window.speechSynthesis) speechSynthesis.cancel(); });
+    updateVoiceBtn();
+    const budgetVal=$('budgetVal'), scoreVal=$('scoreVal'), comboVal=$('comboVal'), tasksDone=$('tasksDone'), tasksTotal=$('tasksTotal');
+    const modalOverlay=$('modalOverlay'), modalEmoji=$('modalEmoji'), modalTitle=$('modalTitle'), modalDesc=$('modalDesc'), modalBest=$('modalBest'), btnRestart=$('btnRestart');
+    const toast=$('toast'), prog1=$('prog1'), prog2=$('prog2'), prog3=$('prog3');
+
+    const taskTemplates = [
+        { name:'Офисные кресла', icon:'🪑', desc:'Новый отдел — 20 шт.' },
+        { name:'Столы',          icon:'🪵', desc:'Сборка и установка' },
+        { name:'Ламинат',        icon:'🧱', desc:'Заменить покрытие' },
+        { name:'Краска',         icon:'🎨', desc:'40 л на этаж' },
+        { name:'Принтер МФУ',    icon:'🖨️', desc:'Сканер + печать' },
+        { name:'Мониторы',       icon:'🖥️', desc:'6 шт. для отдела' },
+        { name:'Кондиционеры',   icon:'❄️', desc:'2 шт., монтаж' },
+        { name:'Сейф',           icon:'🔐', desc:'Для приёмки залога' },
+    ];
+
+    // Доводы для спора с СБ (правильные = brak/гарантия, неправильные — отговорки)
+    const ARG_CORRECT = [
+        '🔧 Дешёвый уже давал брак — переделка выйдет дороже',
+        '📉 Экономия мнимая: на дешёвом нет гарантии',
+        '🛠️ Ремонт и простой съедят всю «экономию»',
+    ];
+    const ARG_WRONG = [
+        '🕒 Так просто быстрее доставка',
+        '👔 Это указание руководства',
+        '😎 Хочу взять подороже, престижнее',
+        '🤷 Без особых причин, так привычнее',
+    ];
+
+    const state = {
+        timer:60, budget:100, score:0, combo:0, bestCombo:0,
+        tasksDone:0, totalTasks:3, level:1, gameOver:false,
+        timerInterval:null, taskQueue:[], current:null,
+        choice:null, sbActive:false, sbPicking:false, argLock:false, argTimer:null,
+        economistActive:false, accountantActive:false, accTimer:null, accIdx:-1,
+        grace:3,
+        perks:{timeBonus:0, budgetBonus:0, costMult:1, igniteMult:1, fireDrainMult:1, scoreMult:1}, perkIcons:[]
+    };
+
+    const PERKS = [
+        { icon:'⏱️', title:'+15 секунд',          desc:'Больше времени на каждый этаж',  apply:p=>p.timeBonus+=15 },
+        { icon:'💰', title:'+20% бюджета',         desc:'Запас прочности на старте',       apply:p=>p.budgetBonus+=20 },
+        { icon:'🤝', title:'Скидка поставщика −30%', desc:'Все траты бюджета дешевле',      apply:p=>p.costMult*=0.7 },
+        { icon:'🧯', title:'Меньше ЧП',            desc:'Аварии реже и тушатся легче',    apply:p=>{p.igniteMult*=0.55; p.fireDrainMult*=0.6;} },
+        { icon:'⭐', title:'+50% очков',           desc:'Больше очков за все действия',    apply:p=>p.scoreMult*=1.5 },
+    ];
+    function resetPerks(){ state.perks={timeBonus:0,budgetBonus:0,costMult:1,igniteMult:1,fireDrainMult:1,scoreMult:1}; state.perkIcons=[]; }
+
+    const anyDialog = () => state.sbActive || state.economistActive || state.accountantActive;
+    function showToast(msg, dur=1700){ toast.textContent=msg; toast.classList.add('show'); clearTimeout(toast._h); toast._h=setTimeout(()=>toast.classList.remove('show'),dur); }
+    function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+    function shuffle(a){ return a.slice().sort(()=>Math.random()-0.5); }
+    function bestKey(){ try{ return parseInt(localStorage.getItem('sks_best')||'0'); }catch(e){ return 0; } }
+    function saveBest(s){ try{ if(s>bestKey()) localStorage.setItem('sks_best', String(s)); }catch(e){} }
+
+    function gainCombo(){ state.combo++; if(state.combo>state.bestCombo) state.bestCombo=state.combo; if(state.combo%3===0){ state.timer+=4; timerDisplay.textContent=state.timer; showToast('🔥 Серия x'+state.combo+'! +4 секунды', 1400); } updateStats(); }
+    function breakCombo(){ state.combo=0; updateStats(); }
+    function addPoints(base){ state.score += Math.round(base*(1+state.combo*0.5)*state.perks.scoreMult); updateStats(); }
+    function spendBudget(n){ state.budget = Math.max(0, state.budget - Math.round(n*state.perks.costMult)); }
+
+    // ---------- Таймер + пожары ----------
+    function startTimer(){
+        if(state.timerInterval) clearInterval(state.timerInterval);
+        state.timerInterval = setInterval(tick, 1000);
+    }
+    function stopTimer(){ if(state.timerInterval){ clearInterval(state.timerInterval); state.timerInterval=null; } }
+
+    function tick(){
+        if(state.gameOver) return;
+        state.timer--;
+        timerDisplay.textContent = state.timer;
+        timerDisplay.classList.toggle('danger', state.timer<=10);
+        if(state.grace>0) state.grace--;
+
+        // горящая задача — жжёт бюджет
+        const t = state.current;
+        if(t && t.burning){
+            t.fireLeft--;
+            const drain = (t.hazardType==='flood'?1:2) * state.perks.fireDrainMult;
+            state.budget = Math.max(0, state.budget - drain);
+            if(t.fireLeft<=0){
+                t.burning=false; breakCombo();
+                spendBudget(t.hazardType==='flood'?5:6);
+                showToast(t.hazardType==='flood'?'🌊 Затопило! Бюджет и серия пострадали':'💥 Сгорело! Бюджет и серия пострадали');
+                renderTask();
+            } else renderTask();
+            updateStats();
+        }
+        // случайное ЧП
+        else if(t && !t.burning && !t.delivering && !anyDialog() && state.grace<=0){
+            const chance = (0.07 + (state.level-1)*0.035) * state.perks.igniteMult;
+            if(Math.random() < chance) ignite(t);
+        }
+
+        if(state.budget<=0){ stopTimer(); endGame(false,'💸 Бюджет исчерпан!'); return; }
+        if(state.timer<=0){ stopTimer(); endGame(false,'⏰ Время вышло!'); }
+    }
+
+    function ignite(t){
+        const flood = state.level>=2 && Math.random()<0.4;
+        t.burning=true;
+        t.hazardType = flood ? 'flood' : 'fire';
+        t.fireLeft = flood ? 8 : 6;
+        t.tapsNeeded = flood ? 3 : 1;
+        t.tapsDone = 0;
+        showToast(flood ? '💧 ЧП! Прорвало трубу у «'+t.name+'» — вычерпывай!' : '🔥 ЧП! «'+t.name+'» загорелась — туши!', 1700);
+        renderTask();
+    }
+
+    // ---------- Задачи ----------
+    function generateTasks(){
+        const count = 3 + Math.min(state.level-1, 2);
+        state.totalTasks = count;
+        state.taskQueue = shuffle(taskTemplates).slice(0,count).map((t,i)=>({
+            id:'t'+i, name:t.name, icon:t.icon, desc:t.desc,
+            done:false, delivering:false, burning:false, fireLeft:0, isRework:false
+        }));
+        state.tasksDone = 0;
+        nextTask();
+    }
+
+    function nextTask(){
+        const pending = state.taskQueue.find(t=>!t.done && !t.delivering);
+        state.current = pending || null;
+        if(state.current){ hintText.textContent = '📌 '+state.current.name; }
+        else if(state.taskQueue.some(t=>t.delivering)){ hintText.textContent = '⏳ Ждём доставку качественного товара...'; }
+        else hintText.textContent = '🎉 Всё готово!';
+        renderTask(); updateStats();
+    }
+
+    function renderTask(){
+        const t = state.current;
+        if(!t){
+            taskContainer.innerHTML = `<div style="color:#8ba0b8;text-align:center;padding:24px 0;">${state.taskQueue.some(x=>x.delivering)?'⏳ Ожидаем доставку...':'✅ Все задачи выполнены'}</div>`;
+            return;
+        }
+        const haz = t.burning;
+        const flood = t.hazardType==='flood';
+        const remTaps = haz ? (t.tapsNeeded - t.tapsDone) : 0;
+        const hazLabel = flood ? `💧 Вычерпать (${remTaps})` : `🧯 Тушить (${t.fireLeft})`;
+        const hazWarn = flood ? '🌊 ТОПИТ!' : '🔥 ГОРИТ!';
+        const actionHtml = haz
+            ? `<button class="firebtn" data-action="hazard">${hazLabel}</button>`
+            : `<button class="buy" data-action="buy">💰 Купить</button>`;
+        taskContainer.innerHTML = `
+            <div class="task-card ${haz?'fire':''}">
+                <div class="info">
+                    <div class="name">${t.icon} ${t.name}</div>
+                    <div class="sub">${t.desc} ${haz?hazWarn:''}</div>
+                </div>
+                <div class="actions">${actionHtml}</div>
+            </div>`;
+        const btn = taskContainer.querySelector('button[data-action]');
+        if(btn) btn.addEventListener('click', e=>{
+            e.stopPropagation();
+            if(btn.dataset.action==='buy') openSB();
+            else handleHazard(t);
+        });
+    }
+
+    function handleHazard(t){
+        if(!t.burning) return;
+        t.tapsDone++;
+        if(t.tapsDone < t.tapsNeeded){ renderTask(); return; } // ещё нажатия (труба)
+        const flood = t.hazardType==='flood';
+        const fast = t.fireLeft >= (flood?4:3);
+        t.burning=false;
+        spendBudget(flood?4:3);
+        if(fast){ addPoints(40); gainCombo(); showToast(flood?'⚡ Быстро вычерпал! +очки':'⚡ Быстро потушил! +очки'); }
+        else { showToast(flood?'💧 Откачал воду в последний момент':'🧯 Потушил в последний момент'); }
+        renderTask(); updateStats();
+    }
+
+    function markDone(t, msg){
+        if(t.done) return;
+        t.done=true; t.delivering=false; t.burning=false;
+        state.tasksDone++;
+        if(msg) showToast(msg);
+        updateStats();
+        if(state.current===t) state.current=null;
+        renderTask();
+        if(!checkWin() && !state.current) setTimeout(nextTask, 450);
+    }
+
+    function checkWin(){
+        if(state.taskQueue.every(t=>t.done)){
+            setTimeout(()=>endGame(true,'🏆 Все задачи закрыты!'), 400);
+            return true;
+        }
+        return false;
+    }
+
+    // ---------- Служба Безопасности ----------
+    function openSB(){
+        if(anyDialog() || !state.current || state.current.burning) return;
+        state.sbActive=true; state.sbPicking=false; state.choice=null;
+        sbDialog.classList.add('active');
+        sbText.textContent = rnd([
+            'Коллеги, берём самый дешёвый вариант — 1 200 ₽. Согласны?',
+            'Бюджет жмём. Предлагаю дешёвый за 1 200 ₽. Ок?',
+            'Зачем переплачивать? Дешёвый, 1 200 ₽. Утверждаем?'
+        ]);
+        say(sbText.textContent, 'sb');
+        priceOptions.style.display='flex';
+        priceOptions.querySelectorAll('.opt').forEach(o=>o.classList.remove('selected','dim','pickable'));
+        argArea.classList.remove('active'); argArea.innerHTML='';
+        sbActions.style.display='flex';
+        sbAgree.style.display='inline-block';
+        sbDebate.style.display='inline-block';
+    }
+
+    function closeSB(){
+        sbDialog.classList.remove('active');
+        state.sbActive=false; state.sbPicking=false;
+        if(state.argTimer){ clearInterval(state.argTimer); state.argTimer=null; }
+        if(state.choice==='cheap'){ applyCheap(); }
+        else if(state.choice==='quality' || state.choice==='fast'){ openEconomist(); }
+    }
+
+    sbAgree.addEventListener('click', ()=>{
+        if(!state.sbActive) return;
+        state.choice='cheap'; breakCombo();
+        priceOptions.querySelector('.opt.cheap').classList.add('selected');
+        sbText.textContent='😔 Ладно, берём дешёвый...';
+        sbActions.style.display='none';
+        setTimeout(closeSB, 650);
+    });
+
+    sbDebate.addEventListener('click', ()=>{
+        if(!state.sbActive) return;
+        sbText.textContent='Докажите, почему НЕ брать дешёвый. 6 секунд!';
+        priceOptions.style.display='none';
+        sbActions.style.display='none';
+        state.argLock=false;
+        // случайный набор: 1 верный + 2 неверных, перемешать
+        const correct = rnd(ARG_CORRECT);
+        const wrongs = shuffle(ARG_WRONG).slice(0,2);
+        const items = shuffle([{t:correct,ok:true}, {t:wrongs[0],ok:false}, {t:wrongs[1],ok:false}]);
+        argArea.innerHTML = `<div class="argclock" id="argClock">⏱️ 6</div>` +
+            items.map(it=>`<div class="arg-btn" data-ok="${it.ok}">${it.t}</div>`).join('');
+        argArea.classList.add('active');
+        let left=6; const clock=$('argClock');
+        if(state.argTimer) clearInterval(state.argTimer);
+        state.argTimer=setInterval(()=>{
+            left--; if(clock) clock.textContent='⏱️ '+left;
+            if(left<=0){ clearInterval(state.argTimer); state.argTimer=null;
+                if(!state.argLock){ state.argLock=true; sbText.textContent='⏰ Не успели! Берём дешёвый.'; breakCombo(); state.choice='cheap'; setTimeout(closeSB,700); }
+            }
+        },1000);
+        argArea.querySelectorAll('.arg-btn').forEach(b=>{
+            b.addEventListener('click', ()=>{
+                if(state.argLock) return; state.argLock=true;
+                if(state.argTimer){ clearInterval(state.argTimer); state.argTimer=null; }
+                argArea.querySelectorAll('.arg-btn').forEach(x=>x.style.pointerEvents='none');
+                if(b.dataset.ok==='true'){
+                    b.classList.add('correct'); addPoints(80); gainCombo();
+                    sbText.textContent='✅ Убедили! Выберите вариант закупки:';
+                    setTimeout(showPickGoodOption, 800);
+                } else {
+                    b.classList.add('wrong'); breakCombo(); state.choice='cheap';
+                    sbText.textContent='❌ Не убедительно. Берём дешёвый.';
+                    setTimeout(closeSB, 900);
+                }
+            });
+        });
+    });
+
+    function showPickGoodOption(){
+        argArea.classList.remove('active'); argArea.innerHTML='';
+        priceOptions.style.display='flex';
+        state.sbPicking=true;
+        priceOptions.querySelectorAll('.opt').forEach(o=>{
+            o.classList.remove('selected');
+            if(o.dataset.type==='cheap'){ o.classList.add('dim'); }
+            else { o.classList.add('pickable'); o.onclick=()=>{
+                if(!state.sbPicking) return;
+                state.sbPicking=false; state.choice=o.dataset.type;
+                priceOptions.querySelectorAll('.opt').forEach(x=>x.classList.remove('selected'));
+                o.classList.add('selected');
+                setTimeout(closeSB, 450);
+            }; }
+        });
+    }
+
+    // ---------- Экономист ----------
+    function openEconomist(){
+        if(!state.current || state.current.done) return;
+        state.economistActive=true;
+        economistDialog.classList.add('active');
+        economistText.textContent='Средства ограничены. Куда направить бюджет?';
+        say(economistText.textContent, 'economist');
+        economistDialog.querySelectorAll('#economistGame .opt').forEach(o=>o.classList.remove('selected'));
+    }
+    economistDialog.querySelectorAll('#economistGame .opt').forEach(o=>{
+        o.addEventListener('click', function(){
+            economistDialog.querySelectorAll('#economistGame .opt').forEach(x=>x.classList.remove('selected'));
+            this.classList.add('selected');
+        });
+    });
+    economistOk.addEventListener('click', ()=>{
+        if(!state.economistActive) return;
+        const sel = economistDialog.querySelector('#economistGame .opt.selected');
+        if(!sel){ showToast('⚠️ Выберите приоритет!',1000); return; }
+        const p = sel.dataset.prio;
+        if(p==='task'){ spendBudget(5); showToast('📦 На задачу. Бюджет -5%',1100); }
+        else if(p==='balance'){ spendBudget(3); addPoints(20); gainCombo(); showToast('⚖️ Грамотно! +очки, бюджет -3%',1100); }
+        else { spendBudget(2); showToast('📋 В резерв. Бюджет -2%',1100); }
+        economistDialog.classList.remove('active');
+        state.economistActive=false;
+        updateStats();
+        openAccountant();
+    });
+
+    // ---------- Бухгалтер (сверка ИНН) ----------
+    function openAccountant(){
+        if(!state.current || state.current.done) return;
+        state.accountantActive=true;
+        accountantDialog.classList.add('active');
+        say('Сверьте реквизиты. Найдите неверную цифру.', 'accountant');
+        // базовый ИНН
+        let base=''; for(let i=0;i<10;i++) base+=Math.floor(Math.random()*10);
+        const arr=base.split('');
+        state.accIdx=Math.floor(Math.random()*10);
+        let wrong; do{ wrong=String(Math.floor(Math.random()*10)); }while(wrong===arr[state.accIdx]);
+        const arr2=arr.slice(); arr2[state.accIdx]=wrong;
+        innRef.innerHTML = arr.map(d=>`<span>${d}</span>`).join('');
+        innDisplay.innerHTML = arr2.map((d,i)=>`<span class="d" data-idx="${i}">${d}</span>`).join('');
+        innDisplay.querySelectorAll('.d').forEach(el=>{
+            el.addEventListener('click', ()=>{
+                if(!state.accountantActive) return;
+                if(parseInt(el.dataset.idx)===state.accIdx) accountantPass();
+                else { el.style.background='#e74c3c55'; showToast('❌ Эта совпадает. Ищи дальше!',800); }
+            });
+        });
+        let left=4; accClock.textContent='⏱️ '+left;
+        if(state.accTimer) clearInterval(state.accTimer);
+        state.accTimer=setInterval(()=>{
+            left--; accClock.textContent='⏱️ '+left;
+            if(left<=0){ clearInterval(state.accTimer); state.accTimer=null;
+                if(state.accountantActive) accountantFail();
+            }
+        },1000);
+    }
+    function accountantPass(){
+        clearInterval(state.accTimer); state.accTimer=null;
+        state.accountantActive=false; accountantDialog.classList.remove('active');
+        addPoints(50); gainCombo();
+        showToast('✅ Ошибка найдена! +очки',1000);
+        finalizePurchase();
+        updateStats();
+    }
+    function accountantFail(){
+        state.accountantActive=false; accountantDialog.classList.remove('active');
+        breakCombo(); spendBudget(5);
+        showToast('⏰ Просрочили проверку. Бюджет -5%, серия сброшена',1300);
+        finalizePurchase();
+        updateStats();
+    }
+
+    function finalizePurchase(){
+        const t=state.current; if(!t) return;
+        if(state.choice==='quality'){
+            addPoints(120); gainCombo();
+            spendBudget(6);
+            t.delivering=true;
+            showToast('⭐ Качественно! Доставка пошла (+очки)',1500);
+            state.current=null; renderTask(); updateStats();
+            nextTask();
+            setTimeout(()=>{ if(t.delivering) markDone(t,'📦 Качественный «'+t.name+'» доставлен!'); }, 4500);
+        } else { // fast
+            addPoints(60); gainCombo();
+            spendBudget(9);
+            markDone(t,'🚀 Быстро! «'+t.name+'» закрыта (дорого)');
+        }
+    }
+
+    // ---------- Дешёвый выбор → брак ----------
+    function applyCheap(){
+        const t=state.current; if(!t) return;
+        spendBudget(10);
+        consequenceBox.classList.add('active');
+        consequenceDesc.textContent='Дешёвый «'+t.name+'» оказался браком! Бюджет -10%, добавлена переделка.';
+        say('Брак! Переделка! Дешёвый '+t.name+' сломался.', 'sb');
+        if(!t.isRework){
+            state.taskQueue.push({ id:'r'+Date.now(), name:'Переделка: '+t.name, icon:'🔧', desc:'Замена брака', done:false, delivering:false, burning:false, fireLeft:0, isRework:true });
+            state.totalTasks++;
+        }
+        setTimeout(()=>consequenceBox.classList.remove('active'), 2600);
+        markDone(t, '🟢 Дешёвый оплачен — но будет переделка');
+        updateStats();
+    }
+
+    // ---------- Статистика ----------
+    function updateStats(){
+        budgetVal.textContent = Math.round(state.budget)+'%';
+        scoreVal.textContent = state.score;
+        comboVal.textContent = state.combo;
+        tasksDone.textContent = state.tasksDone;
+        tasksTotal.textContent = state.totalTasks;
+        const p = Math.min(100, (state.tasksDone/Math.max(1,state.totalTasks))*100);
+        prog1.style.width=p+'%';
+        prog2.style.width=Math.min(100,p+8)+'%';
+        prog3.style.width=Math.min(100,p+4)+'%';
+    }
+
+    // ---------- Конец ----------
+    function endGame(won, message){
+        if(state.gameOver) return;
+        state.gameOver=true; stopTimer();
+        if(state.argTimer) clearInterval(state.argTimer);
+        if(state.accTimer) clearInterval(state.accTimer);
+        if(won){ state.score += state.timer*5 + state.budget*3; }
+        saveBest(state.score);
+        modalOverlay.classList.add('active');
+        modalEmoji.textContent = won?'🏆':'😞';
+        modalTitle.textContent = won?'Этаж сдан!':'Провал!';
+        say(won?'Этаж сдан! Отличная работа!':'Провал! '+message, 'narrator');
+        modalDesc.textContent = message + ` · Очки: ${state.score} · Бюджет: ${state.budget}% · Серия макс: ${state.bestCombo}`;
+        modalBest.textContent = '🥇 Рекорд: ' + Math.max(state.score, bestKey());
+        btnRestart.textContent = won ? (state.level<3?'⬆️ Следующий этаж':'🔄 Играть заново') : '🔄 Попробовать снова';
+        updateStats();
+    }
+
+    btnRestart.addEventListener('click', ()=>{
+        modalOverlay.classList.remove('active');
+        const won = modalTitle.textContent==='Этаж сдан!';
+        if(won && state.level<3){ state.level++; showPerkModal(); }
+        else { state.level=1; state.score=0; resetPerks(); startLevel(); }
+    });
+
+    function showPerkModal(){
+        const box=document.getElementById('perkChoices');
+        box.innerHTML='';
+        shuffle(PERKS).slice(0,3).forEach(pk=>{
+            const el=document.createElement('div');
+            el.className='perk-card';
+            el.innerHTML=`<div class="pic">${pk.icon}</div><div><div class="pt">${pk.title}</div><div class="pd">${pk.desc}</div></div>`;
+            el.addEventListener('click', ()=>{
+                pk.apply(state.perks); state.perkIcons.push(pk.icon);
+                document.getElementById('perkModal').classList.remove('active');
+                startLevel();
+            });
+            box.appendChild(el);
+        });
+        document.getElementById('perkModal').classList.add('active');
+    }
+
+    function startLevel(){
+        state.gameOver=false;
+        state.budget=Math.min(140, 100 + state.perks.budgetBonus); state.combo=0;
+        state.timer=60+(state.level-1)*10 + state.perks.timeBonus;
+        state.grace=3;
+        state.current=null; state.choice=null;
+        state.sbActive=state.economistActive=state.accountantActive=state.sbPicking=false;
+        consequenceBox.classList.remove('active');
+        sbDialog.classList.remove('active');
+        economistDialog.classList.remove('active');
+        accountantDialog.classList.remove('active');
+        floorLabel.textContent='Этаж '+state.level+(state.perkIcons.length?' '+state.perkIcons.join(''):'');
+        timerDisplay.textContent=state.timer; timerDisplay.classList.remove('danger');
+        generateTasks();
+        updateStats();
+        startTimer();
+        showToast('🏢 Этаж '+state.level+': закупай с умом и туши пожары!', 2200);
+        say('Этаж '+state.level+'. Закупай с умом и туши пожары!', 'narrator');
+    }
+
+    // ---------- Старт ----------
+    function init(){
+        state.level=1; state.score=0; state.bestCombo=0;
+        resetPerks();
+        startLevel();
+    }
+    init();
+</script>
+</body>
+</html>
