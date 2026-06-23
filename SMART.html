@@ -65,7 +65,7 @@
         .dialog .options .opt.dim { opacity: 0.3; pointer-events:none; }
         .dialog .options .opt.pickable:active { transform: scale(0.95); }
         .dialog .options .opt.selected { border-color: #fff; background: #1a2f4c; }
-        #economistGame .opt { transition: transform .12s, box-shadow .12s, background .12s; }
+        #economistGame .opt { transition: transform .12s, box-shadow .12s, background .12s; color: #f5f0e6; font-size: 13px; }
         #economistGame .opt:active { transform: scale(0.96); }
         #economistGame .opt.selected { background: #244a6e !important; box-shadow: inset 0 0 0 2px #fff, 0 0 12px #f5a62366; color: #fff; font-weight: 700; transform: translateY(-1px); }
         #economistGame .opt.selected::after { content: " ✓"; color: #2ecc71; font-weight: 800; }
@@ -141,6 +141,7 @@
             <div class="brand"><span class="game">SMART</span><small class="company">СКС Ломбард</small></div>
         </div>
         <div class="head-right">
+            <a href="index.html" title="Меню игр" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:0;line-height:1;text-decoration:none;">🏠</a>
             <button id="voiceBtn" title="Озвучка голосом" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:0;line-height:1;">🗣️</button>
             <span class="floor" id="floorLabel">Этаж 1</span>
             <div class="timer" id="timerDisplay">60</div>
