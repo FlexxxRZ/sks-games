@@ -67,19 +67,18 @@ document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefaul
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
 // ── Touch / virtual gamepad ────────────────────────────────────────────────
+window.padFireTapped = 0; // frames remaining to register fire press
 (function(){
   const map = {
     bLeft:  'ArrowLeft',
     bRight: 'ArrowRight',
     bJump:  'Space',
-    bFire:  'KeyZ',
   };
-  // track which pointer id is pressing which button
   const held = {};
-
   function press(id, code){ if(!held[id]){ held[id]=code; keys[code]=true; } }
   function release(id){ if(held[id]){ keys[held[id]]=false; delete held[id]; } }
 
+  // movement + jump buttons: hold behaviour
   Object.entries(map).forEach(([btnId, code]) => {
     const el = document.getElementById(btnId);
     if(!el) return;
@@ -98,6 +97,18 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
       el.classList.remove('pressed');
     });
   });
+
+  // fire button: tap triggers shot for 3 frames (touchend can't miss it)
+  const bFire = document.getElementById('bFire');
+  if(bFire){
+    bFire.addEventListener('touchstart', e => {
+      e.preventDefault();
+      window.padFireTapped = 3;
+      bFire.classList.add('pressed');
+    }, {passive:false});
+    bFire.addEventListener('touchend',   e => { e.preventDefault(); bFire.classList.remove('pressed'); }, {passive:false});
+    bFire.addEventListener('touchcancel',e => { bFire.classList.remove('pressed'); });
+  }
 
   // Resize canvas to fill #wrap
   function resize(){
@@ -167,14 +178,17 @@ class Player {
 
     // fire
     if(this.fireCD>0) this.fireCD--;
-    if((keys['KeyZ']||keys['KeyX']) && this.form==='fire' && this.fireCD<=0){
+    const firePressed = keys['KeyZ']||keys['KeyX']||(window.padFireTapped>0);
+    if(firePressed && this.form==='fire' && this.fireCD<=0){
       fireballs.push(new Fireball(
         this.x + (this.facing>0?this.w:0),
         this.y+this.h/2-6,
         this.facing*9
       ));
       this.fireCD=22;
+      window.padFireTapped=0;
     }
+    if(window.padFireTapped>0) window.padFireTapped--;
 
     this.vy+=G;
     if(this.vy>18) this.vy=18;
@@ -182,20 +196,23 @@ class Player {
     // X move + collide
     this.x+=this.vx;
     if(this.x<0) this.x=0;
-    this.solveX(lvl.platforms);
+    this.solveX(lvl.platforms, lvl.blocks, lvl.bricks);
 
-    // Y move + collide
+    // Y move + collide — save vy BEFORE move to detect upward bump
+    const preVY = this.vy;
     this.onGround=false;
     this.y+=this.vy;
-    this.solveY(lvl.platforms, lvl.blocks);
+    this.solveY(lvl.platforms, lvl.blocks, lvl.bricks);
 
-    // block bump from below
-    for(const b of lvl.blocks){
-      if(!b.hit && this.vy<0 &&
+    // block/brick bump from below (use preVY — solveY already reset vy to 0)
+    const allBumpable=[...lvl.blocks,...lvl.bricks];
+    for(const b of allBumpable){
+      if(b.hit) continue;
+      if(preVY<0 &&
          this.x+this.w>b.x+2 && this.x<b.x+b.w-2 &&
-         this.y<=b.y+b.h && this.y+5>b.y+b.h){
+         this.y>=b.y+b.h-4 && this.y<=b.y+b.h+4){
         b.bump(this, lvl.items);
-        this.vy=3;
+        this.vy=4;
       }
     }
 
@@ -243,17 +260,18 @@ class Player {
     }
   }
 
-  solveX(plats){
-    for(const p of plats){
+  solveX(plats, blocks=[], bricks=[]){
+    const all=[...plats,...blocks.filter(b=>!b.hit),...bricks.filter(b=>!b.hit)];
+    for(const p of all){
       if(this.y+this.h>p.y+4 && this.y<p.y+p.h){
-        if(this.x+this.w>p.x && this.x+this.w<p.x+16){ this.x=p.x-this.w; this.vx=0; }
-        else if(this.x<p.x+p.w && this.x>p.x+p.w-16){ this.x=p.x+p.w; this.vx=0; }
+        if(this.x+this.w>p.x && this.x+this.w<p.x+18){ this.x=p.x-this.w; this.vx=0; }
+        else if(this.x<p.x+p.w && this.x>p.x+p.w-18){ this.x=p.x+p.w; this.vx=0; }
       }
     }
   }
 
-  solveY(plats, blocks){
-    const all=[...plats,...blocks];
+  solveY(plats, blocks=[], bricks=[]){
+    const all=[...plats,...blocks.filter(b=>!b.hit),...bricks.filter(b=>!b.hit)];
     for(const p of all){
       if(this.x+this.w>p.x+2 && this.x<p.x+p.w-2){
         const prevY=this.y-this.vy;
@@ -697,6 +715,44 @@ class QBlock {
   }
 }
 
+// ── BrickBlock ────────────────────────────────────────────────────────────────
+class BrickBlock {
+  constructor(x,y){ this.x=x; this.y=y; this.w=TILE; this.h=TILE; this.hit=false; this.bounceY=0; this.bouncing=false; this.t=0; }
+  update(){
+    this.t++;
+    if(this.bouncing){ this.bounceY-=2; if(this.bounceY<=-10) this.bouncing=false; }
+    else if(this.bounceY<0){ this.bounceY+=2; }
+  }
+  bump(pl){
+    if(this.hit) return;
+    if(pl.form!=='small'){
+      this.hit=true; score+=50; updateHUD();
+    } else {
+      this.bouncing=true;
+    }
+  }
+  draw(cx){
+    if(this.hit) return;
+    const x=this.x-cx, y=this.y+this.bounceY;
+    // main brick fill
+    ctx.fillStyle='#C87840'; ctx.fillRect(x,y,32,32);
+    // mortar lines
+    ctx.fillStyle='#8B4820';
+    ctx.fillRect(x,y,32,3);       // top border
+    ctx.fillRect(x,y+29,32,3);    // bottom border
+    ctx.fillRect(x,y,3,32);       // left border
+    ctx.fillRect(x+29,y,3,32);    // right border
+    ctx.fillRect(x,y+14,32,4);    // mid horizontal
+    ctx.fillRect(x+14,y,4,14);    // mid vertical top half
+    ctx.fillRect(x+14,y+18,4,14); // mid vertical bot half
+    // highlight
+    ctx.fillStyle='#E09060';
+    ctx.fillRect(x+4,y+4,10,9);
+    ctx.fillRect(x+19,y+4,10,9);
+    ctx.fillRect(x+4,y+19,24,8);
+  }
+}
+
 // ── Ground / Platform rendering ───────────────────────────────────────────────
 function drawPlatform(p, cx, groundY, w){
   const px=p.x-cx;
@@ -810,6 +866,13 @@ function drawFlag(fx, groundY, cx){
 }
 
 // ── Level builder ─────────────────────────────────────────────────────────────
+function addPipe(px, h, platforms, decos, groundY){
+  // visual
+  decos.push({type:'pipe', x:px, y:groundY-h, w:38, h});
+  // solid collision: body + cap (+4px each side, cap 12px tall)
+  platforms.push({x:px-4, y:groundY-h-12, w:46, h:h+12});
+}
+
 function buildLevel(w, lv){
   const groundY=H-80;
   const LW=w===1?3600:4000;
@@ -817,6 +880,7 @@ function buildLevel(w, lv){
   const enemies=[];
   const items=[];
   const blocks=[];
+  const bricks=[];
   const decos=[];
 
   // Full ground with gaps
@@ -857,8 +921,16 @@ function buildLevel(w, lv){
     enemies.push(new Huezhik(3050,groundY-32));
     enemies.push(new Hedgehog(3200,groundY-28));
 
-    decos.push({type:'pipe',x:520,y:groundY-64,w:38,h:64});
-    decos.push({type:'pipe',x:1100,y:groundY-80,w:38,h:80});
+    // bricks
+    for(let i=0;i<5;i++) bricks.push(new BrickBlock(672+i*32, groundY-160));
+    for(let i=0;i<3;i++) bricks.push(new BrickBlock(1600+i*32, groundY-128));
+    for(let i=0;i<4;i++) bricks.push(new BrickBlock(2400+i*32, groundY-128));
+    for(let i=0;i<3;i++) bricks.push(new BrickBlock(3000+i*32, groundY-160));
+
+    // pipes (solid)
+    addPipe(520,64,platforms,decos,groundY);
+    addPipe(1100,80,platforms,decos,groundY);
+    addPipe(2150,96,platforms,decos,groundY);
     decos.push({type:'bush',x:200,y:groundY-28});
     decos.push({type:'bush',x:1800,y:groundY-28});
     decos.push({type:'bush',x:3000,y:groundY-28});
@@ -888,8 +960,14 @@ function buildLevel(w, lv){
     enemies.push(new Hedgehog(3200,groundY-28));
     enemies.push(new Huezhik(3400,groundY-32));
 
-    decos.push({type:'pipe',x:400,y:groundY-96,w:38,h:96});
-    decos.push({type:'pipe',x:1300,y:groundY-80,w:38,h:80});
+    for(let i=0;i<4;i++) bricks.push(new BrickBlock(480+i*32, groundY-160));
+    for(let i=0;i<3;i++) bricks.push(new BrickBlock(1200+i*32, groundY-128));
+    for(let i=0;i<5;i++) bricks.push(new BrickBlock(2100+i*32, groundY-160));
+    for(let i=0;i<3;i++) bricks.push(new BrickBlock(3000+i*32, groundY-128));
+
+    addPipe(400,96,platforms,decos,groundY);
+    addPipe(1300,80,platforms,decos,groundY);
+    addPipe(2500,64,platforms,decos,groundY);
     decos.push({type:'bush',x:100,y:groundY-28});
     decos.push({type:'bush',x:2200,y:groundY-28});
 
@@ -921,6 +999,15 @@ function buildLevel(w, lv){
     enemies.push(new Huezhik(3100,groundY-32));
     enemies.push(new Giraffe(3350,groundY-76));
 
+    for(let i=0;i<4;i++) bricks.push(new BrickBlock(320+i*32, groundY-128));
+    for(let i=0;i<3;i++) bricks.push(new BrickBlock(1150+i*32, groundY-192));
+    for(let i=0;i<4;i++) bricks.push(new BrickBlock(2200+i*32, groundY-160));
+    for(let i=0;i<3;i++) bricks.push(new BrickBlock(3100+i*32, groundY-128));
+
+    addPipe(650,80,platforms,decos,groundY);
+    addPipe(1500,96,platforms,decos,groundY);
+    addPipe(2800,64,platforms,decos,groundY);
+
   } else { // world 2-2
     [[200,groundY-128,64],[450,groundY-192,64],[700,groundY-160,96],
      [1000,groundY-224,64],[1200,groundY-160,96],[1500,groundY-192,64],
@@ -943,10 +1030,19 @@ function buildLevel(w, lv){
     ]){
       enemies.push(type==='g'?new Giraffe(ex,ey):type==='hj'?new Huezhik(ex,ey):new Hedgehog(ex,ey));
     }
+
+    for(let i=0;i<5;i++) bricks.push(new BrickBlock(250+i*32, groundY-192));
+    for(let i=0;i<4;i++) bricks.push(new BrickBlock(1100+i*32, groundY-224));
+    for(let i=0;i<5;i++) bricks.push(new BrickBlock(2200+i*32, groundY-192));
+    for(let i=0;i<4;i++) bricks.push(new BrickBlock(3400+i*32, groundY-192));
+
+    addPipe(550,80,platforms,decos,groundY);
+    addPipe(1600,96,platforms,decos,groundY);
+    addPipe(2700,112,platforms,decos,groundY);
   }
 
   const flagX=LW-220;
-  return {platforms,enemies,items,blocks,decos,groundY,LW,flagX};
+  return {platforms,enemies,items,blocks,bricks,decos,groundY,LW,flagX};
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -996,6 +1092,7 @@ function loop(){
   if(state==='playing'){
     player.update(ld);
     for(const b of ld.blocks) b.update();
+    for(const b of ld.bricks) b.update();
     for(const e of ld.enemies) e.update(ld.platforms);
     for(const it of ld.items) it.update(ld.platforms);
     for(let i=fireballs.length-1;i>=0;i--){
@@ -1033,6 +1130,7 @@ function loop(){
   drawDecorations(ld.decos,camX);
   for(const p of ld.platforms) drawPlatform(p,camX,ld.groundY,world);
   drawFlag(ld.flagX,ld.groundY,camX);
+  for(const b of ld.bricks) b.draw(camX);
   for(const b of ld.blocks) b.draw(camX);
   for(const it of ld.items) it.draw(camX);
   for(const e of ld.enemies) e.draw(camX);
