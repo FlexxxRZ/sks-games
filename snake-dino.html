@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1a2a">
+<title>Змейка-Динозавр | ГК «СКС»</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:system-ui,sans-serif;}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:#0b1a2a;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-start;
+  padding:10px 8px 6px;
+  user-select:none;
+}
+.header{text-align:center;margin-bottom:6px;}
+.logo{display:inline-block;background:#f5a623;color:#0f2135;font-weight:800;letter-spacing:1px;padding:2px 14px;border-radius:20px;font-size:13px;}
+.game-title{color:#f5f0e6;font-size:20px;font-weight:800;margin-top:3px;}
+
+#score-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;max-width:420px;
+  background:linear-gradient(145deg,#1a2f4c,#0f2135);
+  border:1px solid #1e3a5a;border-radius:14px;
+  padding:6px 14px;margin-bottom:7px;
+}
+.sb-block{text-align:center;}
+.sb-label{color:#8ba0b8;font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
+.sb-value{color:#f5a623;font-size:20px;font-weight:800;line-height:1.1;}
+.mode-badge{
+  padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;
+  transition:background .3s,color .3s,border-color .3s;
+  border:1.5px solid;
+  white-space:nowrap;
+}
+.mode-snake{background:#1a4a2a;color:#4CAF50;border-color:#4CAF50;}
+.mode-dino{background:#4a2500;color:#FF8F00;border-color:#FF8F00;}
+
+#bug-hint{
+  color:#8ba0b8;font-size:12px;text-align:center;
+  margin-bottom:6px;height:16px;
+  transition:color .3s;
+}
+
+#canvas-wrap{
+  position:relative;
+  border-radius:14px;overflow:hidden;
+  border:2px solid #1a3a5a;
+  box-shadow:0 0 30px rgba(245,166,35,.12);
+  flex-shrink:0;
+}
+canvas{display:block;}
+
+/* Overlays */
+.overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:rgba(11,26,42,.9);
+  backdrop-filter:blur(5px);
+  padding:20px;
+  text-align:center;
+}
+.overlay h2{color:#f5f0e6;font-size:24px;margin-bottom:8px;}
+.overlay p{color:#8ba0b8;font-size:13px;line-height:1.55;margin-bottom:14px;}
+.overlay p strong{color:#f5a623;}
+.btn{
+  background:#f5a623;color:#0f2135;
+  border:none;border-radius:24px;
+  padding:11px 30px;font-size:15px;font-weight:800;
+  cursor:pointer;transition:transform .1s,box-shadow .1s;
+  box-shadow:0 4px 16px rgba(245,166,35,.35);
+}
+.btn:active{transform:scale(.96);}
+
+/* D-pad */
+#dpad{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:repeat(3,54px);
+  grid-template-rows:repeat(3,54px);
+  gap:5px;
+}
+.dp-btn{
+  background:linear-gradient(145deg,#1a2f4c,#0f2135);
+  border:1.5px solid #2a4a6a;border-radius:14px;
+  color:#c8d8e8;font-size:22px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .08s,transform .08s;
+  touch-action:manipulation;
+}
+.dp-btn:active,.dp-btn.pressed{background:#1e3f60;transform:scale(.93);}
+.dp-empty{background:transparent;border:none;pointer-events:none;}
+
+#home-link{
+  color:#587292;font-size:12px;margin-top:8px;
+  text-decoration:none;
+}
+#home-link:hover{color:#8ba0b8;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">ГК «СКС»</div>
+  <div class="game-title">Змейка&#8209;Динозавр 🦖</div>
+</div>
+
+<div id="score-bar">
+  <div class="sb-block">
+    <div class="sb-label">Очки</div>
+    <div class="sb-value" id="scoreEl">0</div>
+  </div>
+  <div class="mode-badge mode-snake" id="modeBadge">🐍 Змейка</div>
+  <div class="sb-block">
+    <div class="sb-label">Рекорд</div>
+    <div class="sb-value" id="hiEl">0</div>
+  </div>
+</div>
+
+<div id="bug-hint">🐛 Поймай букашек чтобы начать</div>
+
+<div id="canvas-wrap">
+  <canvas id="gc"></canvas>
+
+  <!-- START -->
+  <div class="overlay" id="startScreen">
+    <h2>🐍 Змейка&#8209;Динозавр</h2>
+    <p>
+      Управляй змейкой и ешь <strong>букашек 🐛🦗🐜</strong> — она будет расти.<br><br>
+      Когда поймаешь <strong>5 букашек</strong>, появится <strong>курица 🐔</strong> —
+      змея превратится в <strong>динозавра 🦖</strong> и погонится за ней!<br><br>
+      Съешь курицу — динозавр снова станет змейкой.
+    </p>
+    <button class="btn" id="startBtn">▶ Начать игру</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay" id="goScreen" style="display:none">
+    <h2>💀 Конец игры</h2>
+    <p id="goText"></p>
+    <button class="btn" id="restartBtn">▶ Играть снова</button>
+  </div>
+</div>
+
+<div id="dpad">
+  <div class="dp-empty"></div>
+  <button class="dp-btn" id="dpUp">▲</button>
+  <div class="dp-empty"></div>
+  <button class="dp-btn" id="dpLeft">◀</button>
+  <div class="dp-empty"></div>
+  <button class="dp-btn" id="dpRight">▶</button>
+  <div class="dp-empty"></div>
+  <button class="dp-btn" id="dpDown">▼</button>
+  <div class="dp-empty"></div>
+</div>
+
+<a href="index.html" id="home-link">← На главную</a>
+
+<script>
+// ─── CANVAS SETUP ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+
+const COLS = 16, ROWS = 16;
+// Responsive cell size
+const avW = Math.min(window.innerWidth - 20, 450);
+const avH = Math.min(window.innerHeight - 290, 450);
+const CELL = Math.max(18, Math.floor(Math.min(avW, avH) / COLS));
+const W = COLS * CELL, H = ROWS * CELL;
+canvas.width = W; canvas.height = H;
+
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────────
+const SNAKE_SPEED = 160;   // ms per tick
+const DINO_SPEED  = 125;
+const BUGS_TARGET = 2;     // keep at least 2 bugs on board
+const BUGS_FOR_CHICKEN = 5;
+const CHICKEN_TICKS = 3;   // chicken moves every N ticks
+const CHICKEN_TIMEOUT = 18000; // ms before chicken escapes
+
+const BUG_EMOJIS = ['🐛','🦗','🐜','🦟'];
+
+const CLR = {
+  bg:        '#070f1d',
+  grid:      '#0c1b2e',
+  snakeBody: '#2e7d32',
+  snakeHead: '#43a047',
+  dinoBody:  '#bf360c',
+  dinoHead:  '#e64a19',
+  bug:       '#558b2f',
+  chicken:   '#f9a825',
+};
+
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+let snake, dir, nextDir;
+let bugs, bugFace;  // bugFace: key→emoji
+let chicken, chickenTick, chickenTimeout;
+let mode;           // 'snake' | 'dino'
+let score, bugsEaten;
+let gameActive;
+let loopTimer;
+let flashFrames, flashColor;
+let scorePops;      // [{x,y,val,age,max}]
+let announcement;   // {text,color,age,max}
+let hiScore = +localStorage.getItem('snakeDinoHi') || 0;
+document.getElementById('hiEl').textContent = hiScore;
+
+// ─── AUDIO ─────────────────────────────────────────────────────────────────────
+let AC;
+function ac() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  return AC;
+}
+function beep(freq, dur, type='sine', vol=0.25, delay=0) {
+  try {
+    const a = ac(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, a.currentTime + delay);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + delay + dur);
+    o.start(a.currentTime + delay);
+    o.stop(a.currentTime + delay + dur);
+  } catch(e){}
+}
+function sndBug()  { beep(523,.08,'sine',.2); }
+function sndDino() {
+  beep(261,.1,'square',.25,0);
+  beep(330,.1,'square',.25,.1);
+  beep(392,.1,'square',.25,.2);
+  beep(523,.2,'square',.3,.3);
+}
+function sndChicken() {
+  beep(659,.1,'sine',.3,0);
+  beep(784,.1,'sine',.3,.1);
+  beep(880,.15,'sine',.3,.2);
+  beep(1047,.25,'sine',.35,.35);
+}
+function sndDie() {
+  beep(330,.1,'sawtooth',.25,0);
+  beep(262,.1,'sawtooth',.25,.1);
+  beep(196,.2,'sawtooth',.25,.2);
+}
+function sndEscape() {
+  beep(440,.1,'square',.2,0);
+  beep(330,.15,'square',.2,.1);
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────────
+function randInt(n) { return Math.floor(Math.random()*n); }
+function cellKey(x,y){ return x+','+y; }
+
+function isFree(x,y) {
+  if (x<0||x>=COLS||y<0||y>=ROWS) return false;
+  if (snake.some(s=>s.x===x&&s.y===y)) return false;
+  if (bugs.some(b=>b.x===x&&b.y===y)) return false;
+  if (chicken&&chicken.x===x&&chicken.y===y) return false;
+  return true;
+}
+
+function randFreeCell() {
+  for (let t=0;t<200;t++) {
+    const x=randInt(COLS), y=randInt(ROWS);
+    if (isFree(x,y)) return {x,y};
+  }
+  return null;
+}
+
+// ─── GAME INIT ─────────────────────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('startScreen').style.display='none';
+  document.getElementById('goScreen').style.display='none';
+
+  mode = 'snake';
+  score = 0;
+  bugsEaten = 0;
+  gameActive = true;
+  flashFrames = 0;
+  scorePops = [];
+  announcement = null;
+
+  // Init snake going right from center
+  snake = [{x:10,y:8},{x:9,y:8},{x:8,y:8},{x:7,y:8}];
+  dir = {x:1,y:0};
+  nextDir = {x:1,y:0};
+
+  bugs = [];
+  bugFace = {};
+  chicken = null;
+  chickenTick = 0;
+
+  while (bugs.length < BUGS_TARGET) spawnBug();
+
+  updateUI();
+  resetLoop();
+  render();
+}
+
+function spawnBug() {
+  const p = randFreeCell();
+  if (!p) return;
+  bugs.push(p);
+  bugFace[cellKey(p.x,p.y)] = BUG_EMOJIS[randInt(BUG_EMOJIS.length)];
+}
+
+function spawnChicken() {
+  // Spawn chicken far from snake head
+  let best=null, bestDist=0;
+  for (let t=0;t<60;t++) {
+    const x=randInt(COLS), y=randInt(ROWS);
+    if (!isFree(x,y)) continue;
+    const d=Math.abs(x-snake[0].x)+Math.abs(y-snake[0].y);
+    if (d>bestDist){ bestDist=d; best={x,y}; }
+  }
+  if (best) chicken=best;
+  return !!best;
+}
+
+// ─── LOOP ──────────────────────────────────────────────────────────────────────
+function resetLoop() {
+  if (loopTimer) clearTimeout(loopTimer);
+  schedule();
+}
+function schedule() {
+  const spd = mode==='dino' ? DINO_SPEED : SNAKE_SPEED;
+  loopTimer = setTimeout(()=>{ tick(); }, spd);
+}
+
+function tick() {
+  if (!gameActive) return;
+
+  dir = nextDir;
+
+  // Move head
+  const nx = snake[0].x+dir.x, ny = snake[0].y+dir.y;
+
+  // Wall
+  if (nx<0||nx>=COLS||ny<0||ny>=ROWS) { endGame(); return; }
+
+  // Self (exclude tail — it will move)
+  const body = snake.slice(0,snake.length-1);
+  if (body.some(s=>s.x===nx&&s.y===ny)) { endGame(); return; }
+
+  snake.unshift({x:nx,y:ny});
+  let grow = false;
+
+  // Eat bug?
+  const bi = bugs.findIndex(b=>b.x===nx&&b.y===ny);
+  if (bi!==-1) {
+    delete bugFace[cellKey(bugs[bi].x,bugs[bi].y)];
+    bugs.splice(bi,1);
+    grow = true;
+    score += 10;
+    bugsEaten++;
+    sndBug();
+    scorePops.push({x:nx,y:ny,val:'+10',age:0,max:18,color:'#66bb6a'});
+
+    // Refill bugs
+    while (bugs.length < BUGS_TARGET) spawnBug();
+
+    // Trigger chicken
+    if (bugsEaten % BUGS_FOR_CHICKEN === 0 && mode==='snake') {
+      if (spawnChicken()) {
+        enterDino();
+      }
+    }
+  }
+
+  // Eat chicken (dino mode)?
+  if (mode==='dino' && chicken && nx===chicken.x && ny===chicken.y) {
+    clearTimeout(chickenTimeout);
+    chicken = null;
+    grow = true;
+    score += 50;
+    sndChicken();
+    scorePops.push({x:nx,y:ny,val:'+50',age:0,max:24,color:'#FFD54F'});
+    enterSnake();
+  }
+
+  if (!grow) snake.pop();
+
+  // Move chicken
+  if (mode==='dino' && chicken) {
+    chickenTick++;
+    if (chickenTick >= CHICKEN_TICKS) {
+      chickenTick = 0;
+      moveChicken();
+    }
+  }
+
+  // Decay flash & announcement
+  if (flashFrames>0) flashFrames--;
+  if (announcement) {
+    announcement.age++;
+    if (announcement.age>=announcement.max) announcement=null;
+  }
+  // Decay score pops
+  scorePops = scorePops.filter(p=>{ p.age++; return p.age<p.max; });
+
+  updateUI();
+  render();
+  schedule();
+}
+
+function enterDino() {
+  mode = 'dino';
+  flashFrames = 12;
+  flashColor  = 'rgba(255,143,0,0.25)';
+  chickenTick = 0;
+  sndDino();
+  announcement = {text:'🦖 ПРЕВРАЩЕНИЕ В ДИНОЗАВРА!', color:'#FF8F00', age:0, max:38};
+  // Auto-escape timeout
+  clearTimeout(chickenTimeout);
+  chickenTimeout = setTimeout(()=>{
+    if (gameActive && mode==='dino') {
+      sndEscape();
+      chicken = null;
+      announcement = {text:'🐔 Курица убежала!', color:'#ffca28', age:0, max:30};
+      enterSnake();
+    }
+  }, CHICKEN_TIMEOUT);
+}
+
+function enterSnake() {
+  mode = 'snake';
+  flashFrames = 10;
+  flashColor  = 'rgba(76,175,80,0.2)';
+  clearTimeout(chickenTimeout);
+  if (!announcement || announcement.text.includes('убежала')) {
+    // keep escape announcement
+  } else {
+    announcement = {text:'🐍 Снова змейка!', color:'#66BB6A', age:0, max:28};
+  }
+}
+
+// ─── CHICKEN AI ────────────────────────────────────────────────────────────────
+function moveChicken() {
+  const hx=snake[0].x, hy=snake[0].y;
+  const dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+
+  // Shuffle
+  for (let i=dirs.length-1;i>0;i--){
+    const j=randInt(i+1);[dirs[i],dirs[j]]=[dirs[j],dirs[i]];
+  }
+
+  // Score each move: prefer distance from dino head
+  const scored = dirs.map(d=>{
+    const cx=chicken.x+d.x, cy=chicken.y+d.y;
+    if (cx<0||cx>=COLS||cy<0||cy>=ROWS) return null;
+    if (snake.some(s=>s.x===cx&&s.y===cy)) return null;
+    const dist = Math.abs(cx-hx)+Math.abs(cy-hy);
+    return {d,cx,cy,dist};
+  }).filter(Boolean);
+
+  if (!scored.length) return;
+  // 80% chance: move to best escape tile; 20%: random valid tile
+  scored.sort((a,b)=>b.dist-a.dist);
+  const pick = Math.random()<0.8 ? scored[0] : scored[randInt(scored.length)];
+  chicken = {x:pick.cx, y:pick.cy};
+}
+
+// ─── END GAME ──────────────────────────────────────────────────────────────────
+function endGame() {
+  gameActive = false;
+  clearTimeout(loopTimer);
+  clearTimeout(chickenTimeout);
+  sndDie();
+
+  if (score>hiScore) {
+    hiScore=score;
+    localStorage.setItem('snakeDinoHi',hiScore);
+    document.getElementById('hiEl').textContent=hiScore;
+  }
+
+  render(); // draw final frame
+
+  const goTxt = document.getElementById('goText');
+  goTxt.innerHTML =
+    `Счёт: <strong style="color:#f5a623;font-size:22px">${score}</strong><br>` +
+    `Рекорд: <strong style="color:#f5a623">${hiScore}</strong><br><br>` +
+    `Съедено букашек: <strong style="color:#66BB6A">${bugsEaten}</strong>`;
+  document.getElementById('goScreen').style.display='flex';
+}
+
+// ─── UI ────────────────────────────────────────────────────────────────────────
+function updateUI() {
+  document.getElementById('scoreEl').textContent = score;
+  const badge = document.getElementById('modeBadge');
+  const hint  = document.getElementById('bug-hint');
+
+  if (mode==='dino') {
+    badge.className='mode-badge mode-dino';
+    badge.textContent='🦖 Динозавр';
+    hint.style.color='#FF8F00';
+    hint.textContent='🐔 Лови курицу! Не давай ей убежать!';
+  } else {
+    badge.className='mode-badge mode-snake';
+    badge.textContent='🐍 Змейка';
+    const rem = BUGS_FOR_CHICKEN - (bugsEaten % BUGS_FOR_CHICKEN);
+    hint.style.color='#4CAF50';
+    hint.textContent=rem===BUGS_FOR_CHICKEN
+      ? `🐛 Ешь букашек! До курицы: ${BUGS_FOR_CHICKEN}`
+      : `🐔 До появления курицы: ${rem} букашек`;
+  }
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+function drawRR(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+function emoji(e,cx,cy,sz){
+  ctx.save();
+  ctx.font=`${sz}px Arial`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText(e,cx,cy);
+  ctx.restore();
+}
+
+function render() {
+  // BG
+  ctx.fillStyle=CLR.bg;
+  ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle=CLR.grid;
+  ctx.lineWidth=0.5;
+  for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,H);ctx.stroke();}
+  for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(W,y*CELL);ctx.stroke();}
+
+  // Flash effect on transform
+  if (flashFrames>0 && flashFrames%2===0) {
+    ctx.fillStyle=flashColor;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // Bugs
+  bugs.forEach(b=>{
+    const k=cellKey(b.x,b.y);
+    const cx=b.x*CELL+CELL/2, cy=b.y*CELL+CELL/2;
+    ctx.shadowColor='#76c442'; ctx.shadowBlur=8;
+    emoji(bugFace[k]||'🐛',cx,cy,CELL*.72);
+    ctx.shadowBlur=0;
+  });
+
+  // Chicken
+  if (chicken) {
+    const cx=chicken.x*CELL+CELL/2, cy=chicken.y*CELL+CELL/2;
+    // Pulsing glow
+    const pulse=.6+.4*Math.sin(Date.now()*.008);
+    ctx.shadowColor='#FFD54F'; ctx.shadowBlur=14*pulse;
+    emoji('🐔',cx,cy,CELL*.82);
+    ctx.shadowBlur=0;
+  }
+
+  // Snake/dino body segments
+  const isDino = mode==='dino';
+  const bodyBase = isDino ? CLR.dinoBody : CLR.snakeBody;
+  const headBase = isDino ? CLR.dinoHead : CLR.snakeHead;
+  const pd=2;
+
+  for (let i=snake.length-1;i>=1;i--) {
+    const s=snake[i];
+    const t=i/snake.length;
+    // Gradient from tail (dimmer) to neck (brighter)
+    const alpha=0.45+0.55*(1-t);
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=bodyBase;
+    drawRR(s.x*CELL+pd,s.y*CELL+pd,CELL-pd*2,CELL-pd*2,5);
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // Head rectangle
+  const h=snake[0];
+  ctx.fillStyle=headBase;
+  drawRR(h.x*CELL+pd,h.y*CELL+pd,CELL-pd*2,CELL-pd*2,7);
+  ctx.fill();
+
+  // Head emoji
+  const hEmoji = isDino ? '🦖' : '🐍';
+  emoji(hEmoji, h.x*CELL+CELL/2, h.y*CELL+CELL/2, CELL*.8);
+
+  // Score pops
+  scorePops.forEach(p=>{
+    const progress=p.age/p.max;
+    const alpha=1-progress;
+    const yOff=p.y*CELL - progress*CELL*1.5;
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=p.color;
+    ctx.font=`bold ${Math.round(CELL*.55)}px system-ui`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(p.val, p.x*CELL+CELL/2, yOff+CELL/2);
+    ctx.restore();
+  });
+
+  // Announcement banner
+  if (announcement) {
+    const prog=announcement.age/announcement.max;
+    const alpha=prog<.15 ? prog/.15 : prog>.7 ? 1-(prog-.7)/.3 : 1;
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    // Dark pill bg
+    ctx.fillStyle='rgba(7,15,29,.82)';
+    const tw=Math.min(W-20,300), th=36, tx=(W-tw)/2, ty=H/2-18;
+    drawRR(tx,ty,tw,th,18);
+    ctx.fill();
+    ctx.fillStyle=announcement.color;
+    ctx.font=`bold ${Math.round(CELL*.52)}px system-ui`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(announcement.text,W/2,H/2);
+    ctx.restore();
+  }
+}
+
+// ─── INPUT ─────────────────────────────────────────────────────────────────────
+function applyDir(d) {
+  if (!gameActive) return;
+  switch(d){
+    case 'u': if(dir.y!==1)  nextDir={x:0,y:-1}; break;
+    case 'd': if(dir.y!==-1) nextDir={x:0,y:1};  break;
+    case 'l': if(dir.x!==1)  nextDir={x:-1,y:0}; break;
+    case 'r': if(dir.x!==-1) nextDir={x:1,y:0};  break;
+  }
+}
+
+document.addEventListener('keydown', e=>{
+  const map={'ArrowUp':'u','w':'u','W':'u',
+             'ArrowDown':'d','s':'d','S':'d',
+             'ArrowLeft':'l','a':'l','A':'l',
+             'ArrowRight':'r','d':'r','D':'r'};
+  if (map[e.key]) { applyDir(map[e.key]); e.preventDefault(); }
+  if ((e.key===' '||e.key==='Enter') && !gameActive) startGame();
+});
+
+// D-pad
+function dpSetup(id, d){
+  const btn=document.getElementById(id);
+  btn.addEventListener('touchstart', e=>{ e.preventDefault(); applyDir(d); btn.classList.add('pressed'); },{passive:false});
+  btn.addEventListener('touchend',   ()=>btn.classList.remove('pressed'));
+  btn.addEventListener('mousedown',  ()=>applyDir(d));
+}
+dpSetup('dpUp','u'); dpSetup('dpDown','d');
+dpSetup('dpLeft','l'); dpSetup('dpRight','r');
+
+// Swipe on canvas
+let tx0=0,ty0=0;
+canvas.addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;ty0=e.touches[0].clientY;},{passive:true});
+canvas.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx0, dy=e.changedTouches[0].clientY-ty0;
+  if(Math.abs(dx)<8&&Math.abs(dy)<8) return;
+  if(Math.abs(dx)>Math.abs(dy)) applyDir(dx>0?'r':'l');
+  else applyDir(dy>0?'d':'u');
+},{passive:true});
+
+// Start / restart buttons
+document.getElementById('startBtn').addEventListener('click',  startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+
+// Initial static render
+render();
+</script>
+</body>
+</html>
